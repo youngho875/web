@@ -267,10 +267,15 @@
     // 2. 홈 뷰 (단독 버튼)
     createIconButton('🏠 Home', 'home', () => {
         viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(126.9317, 37.5204, 7000),
-            duration: 2
+                destination: Cesium.Cartesian3.fromDegrees(127.0, 37.5, 800000.0), // 경도, 위도, 고도(미터)
+                orientation: {
+                heading: Cesium.Math.toRadians(0.0),   // 정북 방향 바라보기
+                pitch: Cesium.Math.toRadians(-90.0),  // 하늘에서 땅을 수직으로 내려다보기
+                roll: 0.0
+            }
         });
     });
+
 
     // 3. ⭐ 즐겨찾기 (드롭다운 아이콘)
     const favDropContent = createDropdownIconButton('⭐ 즐겨찾기', 'star');
