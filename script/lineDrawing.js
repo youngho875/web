@@ -34,7 +34,6 @@ window.lineDrawing = (function() {
     function createConfigPanel() {
         if (document.getElementById('line-config-panel')) return;
 
-        // CSS 주입
         const style = document.createElement('style');
         style.innerHTML = `
             #line-config-panel {
@@ -175,7 +174,6 @@ window.lineDrawing = (function() {
         `;
         document.body.appendChild(configPanel);
 
-        // 이벤트 버블링(지도 클릭으로 새어 나가는 현상) 원천 차단
         configPanel.addEventListener('mousedown', function(e) { e.stopPropagation(); });
         configPanel.addEventListener('click', function(e) { e.stopPropagation(); });
         configPanel.addEventListener('dblclick', function(e) { e.stopPropagation(); });
@@ -337,26 +335,24 @@ window.lineDrawing = (function() {
         }
     }
 
-    // 🟢 [수정 핵심] 동적 변경 시 Callback 대신 직접 객체를 덮어씌워 렌더러를 안정화합니다.
     function updateDynamicStyles() {
         if (activeLine && activeLine.polyline) {
             activeLine.polyline.material = getLineMaterial(currentConfig.color, currentConfig.type === 'dashed');
-            activeLine.polyline.width = currentConfig.width; // width도 직접 할당
+            activeLine.polyline.width = currentConfig.width;
         }
         
         updateEndpointShape(currentConfig.startStyle, startPosition, { get value() { return startShapeMarker; }, set value(v) { startShapeMarker = v; } }, endPosition, currentConfig.color);
         updateEndpointShape(currentConfig.endStyle, endPosition, { get value() { return endShapeMarker; }, set value(v) { endShapeMarker = v; } }, startPosition, currentConfig.color);
     }
 
-    // 🎨 CallbackProperty는 오직 움직이는 '좌표(Positions)'에만 사용합니다!
     function drawDynamicLine() {
         return viewer.entities.add({
             polyline: {
                 positions: new Cesium.CallbackProperty(() => {
                     return (startPosition && endPosition) ? [startPosition, endPosition] : [];
                 }, false),
-                width: currentConfig.width, // 🟢 CallbackProperty 제거
-                material: getLineMaterial(currentConfig.color, currentConfig.type === 'dashed'), // 🟢 CallbackProperty 제거! (직접 프로퍼티 할당)
+                width: currentConfig.width,
+                material: getLineMaterial(currentConfig.color, currentConfig.type === 'dashed'),
                 clampToGround: true,
                 classificationType: Cesium.ClassificationType.BOTH
             }
@@ -409,20 +405,44 @@ window.lineDrawing = (function() {
         bindEvents();
     }
 
+    // 🟢 [수정 핵심] 드로잉 확정 및 초기화 통합 헬퍼 함수
+    function finalizeLineDrawing() {
+        if (!startPosition || !endPosition) return;
+
+        const nameInput = document.getElementById('cfg-name');
+        if (nameInput) {
+            currentConfig.name = nameInput.value.trim() !== '' ? nameInput.value : '신규 라인';
+        }
+
+        // 정적 라인 생성 고정
+        drawStaticLine(startPosition, endPosition, currentConfig);
+        
+        // UI 보조 마커 제거 및 상태 초기화
+        clearUIElements();
+
+        startPosition = null;
+        endPosition = null;
+        isEditing = false;
+        editingLine = null;
+        activeControlMarker = null;
+
+        viewer.selectedEntity = undefined;
+        viewer.trackedEntity = undefined;
+    }
+
     function bindEvents() {
         deactivate();
 
-        // 1. 마우스 좌클릭
+        // 1. 마우스 좌클릭 (점 찍기 / 편집 선 선택)
         handler.setInputAction(function(event) {
             const pickedObject = viewer.scene.pick(event.position);
 
-            // [A] 고정 라인 클릭 시 -> 편집 모드 전환
+            // [A] 편집 모드 진입: 이미 고정된 라인을 클릭했을 때
             if (!startPosition && !isEditing && Cesium.defined(pickedObject) && pickedObject.id && drawnLines.includes(pickedObject.id)) {
                 editingLine = pickedObject.id;
                 isEditing = true;
 
                 drawnLines = drawnLines.filter(l => l.id !== editingLine.id);
-                
                 setUIToConfig(editingLine.customData.config);
 
                 startPosition = editingLine.customData.start;
@@ -439,7 +459,7 @@ window.lineDrawing = (function() {
                 return;
             }
 
-            // [B] 편집 중 가이드 꼭짓점 클릭 시 드래그 시작
+            // [B] 편집 도중 노란색 가이드 꼭짓점 클릭: 드래그 앵커 활성화
             if (isEditing && Cesium.defined(pickedObject) && pickedObject.id) {
                 if (pickedObject.id === startPointMarker) {
                     activeControlMarker = 'start'; 
@@ -450,11 +470,17 @@ window.lineDrawing = (function() {
                 }
             }
 
+            // [C] 편집 완료 처리: 편집 모드 상태에서 다른 빈 지형을 한 번 더 클릭하면 편집 확정
+            if (isEditing && activeControlMarker) {
+                finalizeLineDrawing();
+                return;
+            }
+
             const earthPosition = viewer.scene.pickPosition(event.position);
             if (!Cesium.defined(earthPosition)) return;
 
-            // [C] 신규 드로잉 시작
-            if (!startPosition && !isEditing) {
+            // [D] 신규 드로잉 첫 번째 클릭 (시작점 확정)
+            if (!startPosition) {
                 startPosition = earthPosition;
                 endPosition = earthPosition; 
 
@@ -462,11 +488,16 @@ window.lineDrawing = (function() {
                 endPointMarker = createControlPoint(endPosition);
                 activeLine = drawDynamicLine();
                 
-                activeControlMarker = 'end';
+                activeControlMarker = 'end'; // 이제 마우스 움직임에 따라 끝점이 따라다님
+            } 
+            // [E] 신규 드로잉 두 번째 클릭 (끝점 확정 -> 직선 완성)
+            else if (startPosition && activeControlMarker === 'end') {
+                endPosition = earthPosition;
+                finalizeLineDrawing(); // 바로 완성 및 완전 초기화
             }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-        // 2. 마우스 이동
+        // 2. 마우스 이동 (실시간 가이드 피드백)
         handler.setInputAction(function(event) {
             if (!startPosition || !activeLine || !activeControlMarker) return;
 
@@ -482,38 +513,6 @@ window.lineDrawing = (function() {
                 updateDynamicStyles();
             }
         }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-        // 3. 마우스 더블클릭 (드로잉/편집 종료)
-        handler.setInputAction(function(event) {
-            if (!startPosition || !endPosition) return;
-
-            const nameInput = document.getElementById('cfg-name');
-            if (nameInput) {
-                currentConfig.name = nameInput.value.trim() !== '' ? nameInput.value : '신규 라인';
-            }
-
-            drawStaticLine(startPosition, endPosition, currentConfig);
-            
-            clearUIElements();
-
-            startPosition = null;
-            endPosition = null;
-            isEditing = false;
-            editingLine = null;
-            activeControlMarker = null;
-
-            viewer.selectedEntity = undefined;
-            viewer.trackedEntity = undefined;
-
-            const controller = viewer.scene.screenSpaceCameraController;
-            const originalEnableInputs = controller.enableInputs;
-            controller.enableInputs = false;
-
-            setTimeout(() => {
-                controller.enableInputs = originalEnableInputs;
-            }, 100);
-
-        }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     }
 
     function clearUIElements() {
@@ -528,7 +527,6 @@ window.lineDrawing = (function() {
         if (handler) {
             handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
             handler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-            handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
         }
     }
 
