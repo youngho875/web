@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Use correct character set. -->
+  <meta charset="utf-8" />
+  <!-- Tell IE to use the latest, best version. -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+  <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
+  />
+  <title>Hello World!</title>
+  <!--
+  <link rel="stylesheet" href="../scripts/index.css" media="screen">
+  <link rel="stylesheet" href="../scripts/w3.css">
+  <link rel="stylesheet" href="../scripts/scaleboxStyle.css" media="screen">
+-->
+  <script type="text/javascript" src="../ThirdParty/jquery-ui-1.10.3/jquery-1.9.1.js"></script>
+  <script type="text/javascript" src="../ThirdParty/jquery-ui-1.10.3/ui/jquery-ui.js"></script>
+  <script src="../node_modules/cesium/Build/Cesium/Cesium.js"></script>
+  <!-- <script src="./Sandcastle/Sandcastle-header.js"></script> -->
+  <script src="../node_modules/milsymbol/dist/milsymbol.js"></script>
+  <script src="../node_modules/mgrs/dist/mgrs.js"></script>
+  <script src="../node_modules/proj4/dist/proj4.js"></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.2/themes/default/style.min.css" />
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.2/jstree.min.js"></script>
+   
+
+  <style>
+    @import url(../ThirdParty/jquery-ui-1.10.3/themes/vader/jquery-ui.css); 
+    /*@import url(../scripts/d3chart.css);*/
+    @import url(../node_modules/cesium/Build/Cesium/Widgets/widgets.css);
+
+    html,
+    body,
+    #cesiumContainer {
+      width: 100%;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      display: block;
+    }
+   
+  </style>
+</head>
+<body>
+    <div id="cesiumContainer">
+        <div id="sample" style="display: none; position: absolute; z-index: 999; background: white; left: 0px; top: 200px; padding: 10px;"  >
+        </div>  
+        <div id="Sym" style="display: none; position: absolute; z-index: 999; background: white; right: 0px; top: 200px; padding: 10px;"  >
+          <h4 >기본 군대 부호</h4>
+          <div  id="symbolList" style="margin-left: 40%; margin-right: 40%;"></div>
+          <div >
+            <label for="sympo2">피아식별</label>
+            <select name=">StandardIdentity/ExerciseDescriptor" id="sympo2">
+              <option value="-">NULL</option>
+              <option value="P">PENDING</option>
+              <option value="U">UNKNOWN</option>
+              <option value="A">ASSUMED FRIEND</option>
+              <option value="F">FRIEND</option>
+              <option value="N">NEUTRAL</option>
+              <option value="S">SUSPECT</option>
+              <option value="H">HOSTILE</option>
+              <option value="G">EXERCISE PENDING</option>
+              <option value="W">EXERCISE UNKNOWN</option>
+              <option value="M">EXERCISE ASSUMED FRIEND</option>
+              <option value="D">EXERCISE FRIEND</option>
+              <option value="L">EXERCISE NEUTRAL</option>
+              <option value="J">JOKER</option>
+              <option value="K">FAKER</option>
+            </select>
+
+            <div id="layerTree"  style="overflow: auto; height: 500px; width: 300px; border: 1px solid black;"></div>
+          </div>
+        </div>
+    </div>
+        <script type="text/javascript" src="../scripts/initialize.js"></script>
+
+        <script src="../scripts/mousePosition.js"></script>
+        <script src="../scripts/polygonDrawing.js"></script>
+         <script src="../scripts/polyLineDrawing.js"></script>
+        <script src="../scripts/circleDrawing.js"></script>
+        <script src="../scripts/lineDrawing.js"></script>
+        <script src="../scripts/distance.js"></script>
+        <script src="../scripts/symbol.js"></script>
+        <script src="../scripts/mapDrawing.js"></script>
+        <script src="../scripts/sample.js"></script>
+        <script src="../scripts/menu.js"></script>
+        
+
+        <script type="text/javascript" src="../scripts/compass.js"></script>
+        <script type="text/javascript" src="../scripts/mapScale.js"></script>
+       
+        <script>setview();</script> 
+        <script>initCompass();</script> 
+        <script>createScaleBar();</script>
+        <!-- <script>initCoordinateDisplay(viewer);</script> -->
+
+        <script>mapdraw.osmModel();</script>
+        <script>mapdraw.ModelDraw();</script>
+        <script>mapdraw.sampleModel();</script>
+
+
+        <script>
+          //   const viewer = window.CesiumViewer;
+
+          //   // 드래그된 기호를 놓을 수 있게 설정
+          //   viewer.container.addEventListener("dragover", (e) => e.preventDefault());
+
+          //   viewer.container.addEventListener("drop", (e) => {
+          //   e.preventDefault();
+
+          //   const sidc = e.dataTransfer.getData("text/plain");
+          //   if (!sidc) return;
+
+          //   const rect = viewer.container.getBoundingClientRect();
+          //   const x = e.clientX - rect.left;
+          //   const y = e.clientY - rect.top;
+
+          //   const windowPosition = new Cesium.Cartesian2(x, y);
+          //   const cartesian = viewer.scene.pickPosition(windowPosition);
+
+          //   if (cartesian) {
+          //       const symbol = new ms.Symbol(sidc, { size: 50 });
+
+          //       var ht = 50*(symbol.baseHeight/symbol.baseWidth);
+          //       viewer.entities.add({
+          //       position: cartesian,
+          //       billboard: {
+          //           image: symbol.asCanvas(),
+          //           width: 50,
+          //           height: ht,
+          //           verticalOrigin: Cesium.VerticalOrigin.BOTTOM
+          //       }
+          //     });
+          //   }
+          // });
+
+          function openSymbolPopup() {
+            // window.open("symbol", "symbolPopup", "width=300,height=400");
+            var sym = document.getElementById("Sym")
+            if(sym.style.display == "block")
+            {
+              sym.style.display = "none";
+            }
+            else
+            {
+              sym.style.display = "block";
+            }
+          }
+
+          const symbols = [
+              { name: "친군군", sidc: "SFZ*-----------" },
+            ];
+
+            const list = document.getElementById("symbolList");
+
+
+            symbols.forEach(item => {
+              const symbol = new ms.Symbol(item.sidc, { size: 50 });
+              const url = symbol.asSVG();
+
+              const div = document.createElement("div");
+              div.className = "symbolItem";
+              div.draggable = true;
+              div.classList.add('symbol');
+              div.innerHTML = url;
+              // div.innerHTML += "<div>${item.name}</div>";
+
+              div.addEventListener("dragstart", (e) => {
+                e.dataTransfer.setData("text/plain", item.sidc);
+              });
+
+              list.appendChild(div);
+            });
+
+
+
+            $('#layerTree').jstree({
+
+                "plugins" : [ "wholerow" ],
+
+                'core' : { 'data' : {
+                  "url": function (node) {
+                        return "data1/alldata.json"; 
+                    }
+                  } 
+                },
+                "check_callback": true, 
+
+            });
+
+            $('#layerTree').bind('select_node.jstree', function(event, data) {
+                // 노드를 선택했을 때 실행될 코드 작성
+                var selectedNodeId = data.instance.get_node(data.selected).id;
+                var selectedNode = data.instance.get_node(data.selected).data;
+
+                console.log('선택된 노드 ID:', selectedNodeId);
+                console.log('선택된 노드 데이터:', selectedNode);
+                const indc = document.getElementById("sympo2").value;
+
+                var itemCode = "S" + indc.toString() + selectedNode.toString().substr(2,13);
+
+                const list = document.getElementById("symbolList");
+                if(list.children.length > 0)
+                {
+                  list.children[0].remove();
+                }
+
+                const symbol = new ms.Symbol(itemCode, { size: 50 });
+                const url = symbol.asSVG();
+
+                const div = document.createElement("div");
+                div.className = "symbolItem";
+                div.draggable = true;
+                div.classList.add('symbol');
+                div.innerHTML = url;
+                // div.innerHTML += "<div>${item.name}</div>";
+
+                div.addEventListener("dragstart", (e) => {
+                  e.dataTransfer.setData("text/plain", itemCode);
+                });
+
+                list.appendChild(div)
+
+            });
+        </script>
+
+       
+   
+</body>
+</html>
